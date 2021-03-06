@@ -2,7 +2,7 @@ user  nginx;
 worker_processes  1;
 
 error_log /dev/fd/2 warn;
-pid /var/run/nginx.pid;
+pid /run/nginx.pid;
 
 events {
     worker_connections  1024;
@@ -34,20 +34,22 @@ http {
         }
     }
 
-    {% for service in config -%}
-    {% if 'Labels' in service.Spec and 'ingress.host' in service.Spec.Labels -%}
+    {% for entry in entries -%}
     server {
         listen 80;
-        server_name {{ service.Spec.Labels['ingress.host'] }};
+        server_name {{ entry.host }};
 
         location / {
             resolver 127.0.0.11;
-            set $service_host {{ service.Spec.Name }};
-            set $service_port {{ service.Spec.Labels['ingress.port']|default('80') }};
-            set $service_path {{ service.Spec.Labels['ingress.path']|default('/') }};
-            proxy_pass http://$service_host:$service_port$service_path;
+            set $upstream {{ entry.service }}:{{ entry.port }}{{ entry.path}};
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host  $host;
+            proxy_set_header X-Forwarded-Port  $server_port;
+            proxy_pass http://$upstream;
         }
     }
-    {% endif -%}
     {% endfor %}
 }

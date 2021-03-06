@@ -1,4 +1,5 @@
-from docker import Client
+import docker
+from dataclasses import dataclass
 from jinja2 import Template
 
 import os
@@ -43,20 +44,47 @@ with open(nginx_config_path, 'r') as handle:
 with open(nginx_config_template_path, 'r') as handle:
     nginx_config_template = handle.read()
 
-cli = Client(base_url = os.environ['DOCKER_HOST'])
+cli = docker.DockerClient(base_url = os.environ['DOCKER_HOST'])
+
+
+@dataclass
+class ProxyEntry:
+    service: str
+    host : str
+    path : str = ''
+    port: int = 80
+
+
+    @classmethod
+    def from_service(cls, service):
+        return cls(
+            service=service.attrs['Spec']['Name'],
+            host=service.attrs['Spec']['Labels']['ingress.host'],
+            port=service.attrs['Spec']['Labels'].get('ingress.port', 80),
+            path=service.attrs['Spec']['Labels'].get('ingress.path', ''),
+        )
+
+    @classmethod
+    def from_services(cls, services):
+        for service in services:
+            try:
+                yield cls.from_service(service)
+            except:
+                pass
 
 while True:
-    services = cli.services()
+    services = cli.services.list()
+    entries = ProxyEntry.from_services(services)
 
     new_nginx_config = Template(nginx_config_template).render(
-        config = services,
+        entries = entries,
         request_id = os.environ['USE_REQUEST_ID'] in ['true', 'yes', '1'],
         log_pattern = resolve_pattern(os.environ['LOG_FORMAT'])
     )
 
     if current_nginx_config != new_nginx_config:
         current_nginx_config = new_nginx_config
-        print "[Ingress Auto Configuration] Services have changed, updating nginx configuration..."
+        print("[Ingress Auto Configuration] Services have changed, updating nginx configuration...")
         with open(nginx_config_path, 'w') as handle:
             handle.write(new_nginx_config)
 
@@ -64,6 +92,6 @@ while True:
         subprocess.call(['nginx', '-s', 'reload'])
 
         if os.environ['DEBUG'] in ['true', 'yes', '1']:
-            print new_nginx_config
+            print(new_nginx_config)
 
     time.sleep(int(os.environ['UPDATE_INTERVAL']))
