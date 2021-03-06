@@ -1,9 +1,7 @@
-FROM nginx:1.11-alpine
-MAINTAINER Jakob Jarosch <dev@jakobjarosch.de>
-
-RUN apk add --update python py-pip curl; \
-    rm -rf /var/cache/apk/*
-RUN pip install docker-py jinja2
+FROM fedora
+MAINTAINER Ettore Leandro Tognoli <ettoreleandrotognoli@gmail.com>
+RUN dnf install -y nginx python3 python3-pip curl
+RUN pip install docker jinja2
 
 ENV DOCKER_HOST "unix:///var/run/docker.sock"
 ENV UPDATE_INTERVAL "1"
