@@ -6,6 +6,7 @@ import os
 import subprocess
 import time
 
+
 def resolve_pattern(format):
     if format == 'json':
         return '{ \
@@ -35,8 +36,10 @@ def resolve_pattern(format):
     else:
         return '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for" "$request_id"'
 
+
 nginx_config_template_path = '/ingress/nginx.tpl'
 nginx_config_path = '/etc/nginx/nginx.conf'
+nginx_cert_path = '/etc/nginx/certs'
 
 with open(nginx_config_path, 'r') as handle:
     current_nginx_config = handle.read()
@@ -44,24 +47,42 @@ with open(nginx_config_path, 'r') as handle:
 with open(nginx_config_template_path, 'r') as handle:
     nginx_config_template = handle.read()
 
-cli = docker.DockerClient(base_url = os.environ['DOCKER_HOST'])
+cli = docker.DockerClient(base_url=os.environ['DOCKER_HOST'])
 
+def load_secure(host):
+    certificate = os.path.join(nginx_cert_path, host + '.crt')
+    private_key = os.path.join(nginx_cert_path, host + '.key')
+    is_secure = os.path.isfile(certificate) and os.path.isfile(private_key)
+    if not is_secure and not host.startswith('_'):
+        _, host = host.split('.', 1)
+        return load_secure('_.' + host)
+    return {
+        'secure': is_secure,
+        'certificate': certificate,
+        'private_key': private_key,
+    }
 
 @dataclass
 class ProxyEntry:
     service: str
-    host : str
-    path : str = ''
+    host: str
+    path: str = ''
     port: int = 80
-
+    secure: bool = False
+    certificate: str = None
+    private_key: str = None
 
     @classmethod
     def from_service(cls, service):
+        labels = service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Labels',{})
+        labels.update(service.attrs['Spec']['Labels'])
+        host = labels['ingress.host']
         return cls(
             service=service.attrs['Spec']['Name'],
-            host=service.attrs['Spec']['Labels']['ingress.host'],
-            port=service.attrs['Spec']['Labels'].get('ingress.port', 80),
-            path=service.attrs['Spec']['Labels'].get('ingress.path', ''),
+            host=host,
+            port=labels.get('ingress.port', 80),
+            path=labels.get('ingress.path', ''),
+            **load_secure(host),
         )
 
     @classmethod
@@ -72,14 +93,16 @@ class ProxyEntry:
             except:
                 pass
 
+
 while True:
     services = cli.services.list()
     entries = ProxyEntry.from_services(services)
 
     new_nginx_config = Template(nginx_config_template).render(
-        entries = entries,
-        request_id = os.environ['USE_REQUEST_ID'] in ['true', 'yes', '1'],
-        log_pattern = resolve_pattern(os.environ['LOG_FORMAT'])
+        entries=entries,
+        request_id=os.environ['USE_REQUEST_ID'] in ['true', 'yes', '1'],
+        log_pattern=resolve_pattern(os.environ['LOG_FORMAT']),
+        **load_secure('_'),
     )
 
     if current_nginx_config != new_nginx_config:

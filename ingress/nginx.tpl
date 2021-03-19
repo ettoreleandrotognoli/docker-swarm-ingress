@@ -24,8 +24,30 @@ http {
     {% endif %}
 
     server {
-        listen 80;
-        server_name localhost 127.0.0.1;
+        listen 80 default_server;
+        server_name _;
+        access_log off;
+
+        {% if secure -%}
+
+        return 301 https://$host$request_uri;
+
+        {% else -%}
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+
+        {% endif %}
+    }
+
+    {% if secure -%}
+    server {
+        listen 443 ssl default_server;
+        server_name _;
+        ssl_certificate     {{certificate}};
+        ssl_certificate_key {{private_key}};
         access_log off;
 
         location / {
@@ -33,25 +55,59 @@ http {
             index index.html;
         }
     }
+    {% endif %}
 
     {% for entry in entries -%}
+
     server {
         listen 80;
         server_name {{ entry.host }};
 
         location / {
+            {% if entry.secure -%}
+            return 301 https://$host$request_uri;
+            {% else -%}
             resolver 127.0.0.11;
             set $upstream {{ entry.service }}:{{ entry.port }}{{ entry.path}};
             proxy_set_header Host              $host;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "Upgrade";
+            proxy_set_header Upgrade           $http_upgrade;
+            proxy_set_header Connection        "Upgrade";
             proxy_set_header X-Real-IP         $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header X-Forwarded-Host  $host;
             proxy_set_header X-Forwarded-Port  $server_port;
+            # Mitigate httpoxy attack
+            proxy_set_header Proxy "";
+            proxy_pass http://$upstream;
+            {% endif -%}
+        }
+    }
+
+    {% if entry.secure -%}
+    server {
+        listen 443 ssl;
+        server_name {{ entry.host }};
+        ssl_certificate {{ entry.certificate }};
+        ssl_certificate_key {{ entry.private_key }};
+
+        location / {
+            resolver 127.0.0.11;
+            set $upstream {{ entry.service }}:{{ entry.port }}{{ entry.path}};
+            proxy_set_header Host              $host;
+            proxy_set_header Upgrade           $http_upgrade;
+            proxy_set_header Connection        "Upgrade";
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host  $host;
+            proxy_set_header X-Forwarded-Port  $server_port;
+            # Mitigate httpoxy attack
+            proxy_set_header Proxy "";
             proxy_pass http://$upstream;
         }
     }
+    {% endif %}
+
     {% endfor %}
 }
