@@ -1,5 +1,7 @@
 #!/bin/sh
 set -e
 
-nginx
-exec python3 /ingress/ingress.py
+(cd ingress && python3 ingress.py) &
+echo $! > /ingress/ingress.pid
+
+exec nginx -g "daemon off;"
