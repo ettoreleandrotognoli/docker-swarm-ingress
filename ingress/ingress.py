@@ -38,7 +38,7 @@ def resolve_pattern(format):
 
 
 nginx_config_template_path = '/ingress/nginx.tpl'
-nginx_config_path = '/etc/nginx/nginx.conf'
+nginx_config_path = '/etc/nginx/conf.d/default.conf'
 nginx_cert_path = '/etc/nginx/certs'
 
 with open(nginx_config_path, 'r') as handle:
