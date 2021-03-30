@@ -63,6 +63,11 @@ server {
         # Mitigate httpoxy attack
         proxy_set_header Proxy "";
         proxy_pass http://$upstream;
+
+        {% for key,value in entry.config.items() -%}
+            {{key}} {{value}};
+        {% endfor %}
+
         {% endif -%}
     }
 }
@@ -88,6 +93,11 @@ server {
         # Mitigate httpoxy attack
         proxy_set_header Proxy "";
         proxy_pass http://$upstream;
+
+        {% for key,value in entry.config.items() -%}
+        {{key}} {{value}};
+        {% endfor %}
+
     }
 }
 {% endif %}

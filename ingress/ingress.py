@@ -1,5 +1,5 @@
 import docker
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from jinja2 import Template
 
 import os
@@ -78,17 +78,24 @@ class ProxyEntry:
     secure: bool = False
     certificate: str = None
     private_key: str = None
+    config: dict = field(default_factory=dict)
 
     @classmethod
     def from_service(cls, service):
         labels = service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Labels',{})
         labels.update(service.attrs['Spec']['Labels'])
         host = labels['ingress.host']
+        config = dict(
+            (k[14:],v,)
+            for k, v in labels.items()
+            if k.startswith('ingress.nginx.')
+        )
         return cls(
             service=service.attrs['Spec']['Name'],
             host=host,
             port=labels.get('ingress.port', 80),
             path=labels.get('ingress.path', ''),
+            config=config,
             **load_secure(host, labels),
         )
 
