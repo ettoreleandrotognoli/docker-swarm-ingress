@@ -1,6 +1,6 @@
-FROM fedora
+FROM nginx:alpine
 MAINTAINER Ettore Leandro Tognoli <ettoreleandrotognoli@gmail.com>
-RUN dnf install -y nginx python3 python3-pip curl
+RUN apk add py3-pip curl
 RUN pip install docker jinja2
 
 ENV DOCKER_HOST "unix:///var/run/docker.sock"
