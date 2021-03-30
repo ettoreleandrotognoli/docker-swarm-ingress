@@ -49,9 +49,16 @@ with open(nginx_config_template_path, 'r') as handle:
 
 cli = docker.DockerClient(base_url=os.environ['DOCKER_HOST'])
 
-def load_secure(host):
-    certificate = os.path.join(nginx_cert_path, host + '.crt')
-    private_key = os.path.join(nginx_cert_path, host + '.key')
+def load_secure(host, labels = None):
+    labels = labels or {}
+    certificate = labels.get(
+        'ingress.cert',
+        os.path.join(nginx_cert_path, host + '.crt'),
+    )
+    private_key = labels.get(
+        'ingress.key',
+        '.key'.join(certificate.rsplit('.crt',1)),
+    )
     is_secure = os.path.isfile(certificate) and os.path.isfile(private_key)
     if not is_secure and not host.startswith('_'):
         _, host = host.split('.', 1)
@@ -82,7 +89,7 @@ class ProxyEntry:
             host=host,
             port=labels.get('ingress.port', 80),
             path=labels.get('ingress.path', ''),
-            **load_secure(host),
+            **load_secure(host, labels),
         )
 
     @classmethod
