@@ -43,7 +43,7 @@ server {
 {% for entry in entries -%}
 
 server {
-    listen 80;
+    listen {{ entry.insecure_port }};
     server_name {{ entry.host }};
 
     location / {
@@ -74,7 +74,7 @@ server {
 
 {% if entry.secure -%}
 server {
-    listen 443 ssl;
+    listen {{ entry.secure_port }} ssl;
     server_name {{ entry.host }};
     ssl_certificate {{ entry.certificate }};
     ssl_certificate_key {{ entry.private_key }};

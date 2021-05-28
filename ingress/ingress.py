@@ -49,7 +49,8 @@ with open(nginx_config_template_path, 'r') as handle:
 
 cli = docker.DockerClient(base_url=os.environ['DOCKER_HOST'])
 
-def load_secure(host, labels = None):
+
+def load_secure(host, labels=None):
     labels = labels or {}
     certificate = labels.get(
         'ingress.cert',
@@ -57,7 +58,7 @@ def load_secure(host, labels = None):
     )
     private_key = labels.get(
         'ingress.key',
-        '.key'.join(certificate.rsplit('.crt',1)),
+        '.key'.join(certificate.rsplit('.crt', 1)),
     )
     is_secure = os.path.isfile(certificate) and os.path.isfile(private_key)
     if not is_secure and not host.startswith('_'):
@@ -69,6 +70,7 @@ def load_secure(host, labels = None):
         'private_key': private_key,
     }
 
+
 @dataclass
 class ProxyEntry:
     service: str
@@ -78,15 +80,18 @@ class ProxyEntry:
     secure: bool = False
     certificate: str = None
     private_key: str = None
+    secure_port: int = 443
+    insecure_port: int = 80
     config: dict = field(default_factory=dict)
 
     @classmethod
     def from_service(cls, service):
-        labels = service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Labels',{})
+        labels = service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Labels', {
+        })
         labels.update(service.attrs['Spec']['Labels'])
         host = labels['ingress.host']
         config = dict(
-            (k[14:],v,)
+            (k[14:], v,)
             for k, v in labels.items()
             if k.startswith('ingress.nginx.')
         )
@@ -95,6 +100,8 @@ class ProxyEntry:
             host=host,
             port=labels.get('ingress.port', 80),
             path=labels.get('ingress.path', ''),
+            secure_port=labels.get('ingress.secure-port', 443),
+            insecure_port=labels.get('ingress.insecure-port', 80),
             config=config,
             **load_secure(host, labels),
         )
@@ -121,7 +128,8 @@ while True:
 
     if current_nginx_config != new_nginx_config:
         current_nginx_config = new_nginx_config
-        print("[Ingress Auto Configuration] Services have changed, updating nginx configuration...")
+        print(
+            "[Ingress Auto Configuration] Services have changed, updating nginx configuration...")
         with open(nginx_config_path, 'w') as handle:
             handle.write(new_nginx_config)
 
