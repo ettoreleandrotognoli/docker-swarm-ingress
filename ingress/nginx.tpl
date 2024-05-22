@@ -83,9 +83,8 @@ server {
     location / {
         resolver 127.0.0.11;
         set $upstream {{ entry.service }}:{{ entry.port }}{{ entry.path}};
+
         proxy_set_header Host              $host;
-        proxy_set_header Upgrade           $http_upgrade;
-        proxy_set_header Connection        "Upgrade";
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -93,11 +92,12 @@ server {
         proxy_set_header X-Forwarded-Port  $server_port;
         # Mitigate httpoxy attack
         proxy_set_header Proxy "";
-        proxy_pass http://$upstream;
 
         {% for key,value in entry.config.items() -%}
-        {{key}} {{value}};
+            {{key}} {{value}};
         {% endfor %}
+
+        proxy_pass http://$upstream;
 
     }
 }
