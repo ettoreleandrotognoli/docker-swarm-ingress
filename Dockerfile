@@ -1,7 +1,6 @@
 FROM nginx:alpine
 MAINTAINER Ettore Leandro Tognoli <ettoreleandrotognoli@gmail.com>
-RUN apk add py3-pip curl
-RUN pip install docker jinja2
+RUN apk add py3-pip curl py3-jinja2 py3-docker-py
 
 ENV DOCKER_HOST "unix:///var/run/docker.sock"
 ENV UPDATE_INTERVAL "1"
